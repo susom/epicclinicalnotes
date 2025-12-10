@@ -1,0 +1,78 @@
+{
+    "name": "EpicClinicalNotes",
+    "namespace": "Stanford\\EpicClinicalNotes",
+    "description": "This module will facilitate pushing Clinical notes from REDCap to an Epic encounter. ",
+    "documentation": "README.md",
+    "framework-version": 16,
+    "authors": [
+        {
+            "name": "Ihab Zeedia",
+            "email": "ihab.zeedia@stanford.edu",
+            "institution": "Stanford University"
+        }
+    ],
+    "enable-every-page-hooks-on-system-pages": false,
+    "enable-ajax-logging": false,
+    "auth-ajax-actions": [
+        "TestAction"
+    ],
+    "no-auth-ajax-actions": [
+        "TestAction"
+    ],
+    "links": {
+        "project": [
+        ],
+        "control-center": [
+        ]
+    },
+    "no-auth-pages": [
+    ],
+    "project-settings": [
+    ],
+    "system-settings": [
+        {
+            "key": "epic-client-id",
+            "name": "Orchard App Client ID:",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "epic-client-secret",
+            "name": "Orchard App Client Secret:",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "epic-fhir-url",
+            "name": "Epic instance FHIR URL:",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "epic-fhir-base-url",
+            "name": "Epic instance FHIR Base URL:",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "epic-fhir-token-url",
+            "name": "Epic instance- FHIR Token URL:",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "epic-fhir-authorize-url",
+            "name": "Epic instance FHIR Authorize URL:",
+            "required": true,
+            "type": "text"
+        }
+    ],
+    "crons": [
+    ],
+    "compatibility": {
+        "php-version-min": "",
+        "php-version-max": "",
+        "redcap-version-min": "",
+        "redcap-version-max": ""
+    }
+}
