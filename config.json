@@ -21,6 +21,12 @@
     ],
     "links": {
         "project": [
+            {
+                "name": "Test Page",
+                "icon": "fas fa-check-circle",
+                "url": "pages/test.php",
+                "show-header-and-footer": true
+            }
         ],
         "control-center": [
         ]
@@ -28,46 +34,71 @@
     "no-auth-pages": [
     ],
     "project-settings": [
+        {
+            "key": "redcap-mrn-field",
+            "name": "<b>REDCap MRN Field</b>.",
+            "required": true,
+            "type": "field-list"
+        },
+        {
+            "key": "maps",
+            "name": "<b>REDCap SDE mapping</b><br>Define the mapping between REDCap fields and Epic Clinical Notes SDE fields.",
+            "required": true,
+            "repeatable": true,
+            "type": "sub_settings",
+            "sub_settings": [
+                {
+                    "key": "epic-sde-field",
+                    "name": "<b>Epic SDE Field</b><br>The Epic Clinical Notes SDE field to map to.",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "key": "redcap-fields",
+                    "name": "<b>REDCap Fields/b><br>You can select one or more REDCap fields to map to the Epic SDE field. The values from multiple fields will be formatted as follow in SDE<br> REDCap field label1: REDCap response1 | REDCap field label2: REDCap response2.",
+                    "required": true,
+                    "repeatable": true,
+                    "type": "sub_settings",
+                    "sub_settings": [
+                        {
+                            "key": "redcap-field",
+                            "name": "<b>REDCap Field</b><br>The REDCap field to map from.",
+                            "required": true,
+                            "type": "field-list"
+                        }
+                    ]
+                }
+            ]
+        }
     ],
     "system-settings": [
         {
-            "key": "epic-client-id",
-            "name": "Orchard App Client ID:",
+            "key": "epic-authenticator-prefix",
+            "name": "Epic Authenticator EM Prefix:<br><br>Enter the prefix for the Epic Authenticator EM 'epic_authenticator' without this EM wont work.",
             "required": true,
             "type": "text"
         },
         {
-            "key": "epic-client-secret",
-            "name": "Orchard App Client Secret:",
-            "required": true,
+            "key": "epic-access-token",
+            "name": "Epic Access Token: Valid for 1 hour",
+            "required": false,
             "type": "text"
         },
         {
-            "key": "epic-fhir-url",
-            "name": "Epic instance FHIR URL:",
-            "required": true,
-            "type": "text"
-        },
-        {
-            "key": "epic-fhir-base-url",
-            "name": "Epic instance FHIR Base URL:",
-            "required": true,
-            "type": "text"
-        },
-        {
-            "key": "epic-fhir-token-url",
-            "name": "Epic instance- FHIR Token URL:",
-            "required": true,
-            "type": "text"
-        },
-        {
-            "key": "epic-fhir-authorize-url",
-            "name": "Epic instance FHIR Authorize URL:",
-            "required": true,
+            "key": "epic-access-token-timestamp",
+            "name": "Epic Access Token Timestamp:",
+            "required": false,
             "type": "text"
         }
     ],
     "crons": [
+        {
+            "cron_name": "sync-epic-clinical-notes-batch-process",
+            "cron_description": "Sync Epic Clinical Notes Batch Process",
+            "method": "cronSyncEpicClinicalNotesBatchProcess",
+            "cron_frequency": "3600",
+            "cron_max_run_time": "3600"
+        }
     ],
     "compatibility": {
         "php-version-min": "",

@@ -3,92 +3,225 @@
 namespace Stanford\EpicClinicalNotes;
 
 use ExternalModules\ExternalModules;
+use GuzzleHttp\Exception\GuzzleException;
 
 final class Client
 {
-    const string CLIENT_CREDENTIALS = "client_credentials";
-
+    const ENTITY_ID_TYPE = 'LPCHSAMRN';
     private $token;
-
-
-    private $prefix;
-
-    private $client_id;
-
-    private $client_secret;
 
     private \GuzzleHttp\Client $client;
 
-    public function __construct($prefix)
-    {
-        $this->prefix = $prefix;
+    public \Stanford\EpicAuthenticator\EpicAuthenticator $epicAuthenticator;
 
-        $this->client = new \GuzzleHttp\Client([
-                'timeout' => 30,
-                'connect_timeout' => 5,
-                'verify' => false,
-            ]
-        );
-    }
-
+    private \Stanford\EpicClinicalNotes\EpicClinicalNotes $module;
     /**
-     * @return mixed
+     * @param \Stanford\EpicClinicalNotes\EpicClinicalNotes $module
      */
-    public function getClientSecret()
+    public function __construct($module)
     {
-        if (!$this->client_secret) {
-            $this->setClientSecret(ExternalModules::getSystemSetting($this->prefix, EpicClinicalNotes::EPIC_CLIENT_SECRET));
+        $this->module = $module;
+        if ($this->module->getSystemSetting('epic-authenticator-prefix')) {
+            $this->epicAuthenticator = \ExternalModules\ExternalModules::getModuleInstance($this->module->getSystemSetting('epic-authenticator-prefix'));
         }
-        return $this->client_secret;
+
+        $this->client = new \GuzzleHttp\Client();
     }
 
     /**
-     * @param mixed $client_secret
+     * @throws \Exception
      */
-    public function setClientSecret($client_secret): void
+    public function getToken(): string
     {
-        $this->client_secret = $client_secret;
-
-
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getClientId()
-    {
-        if (!$this->client_id) {
-            $this->setClientId(ExternalModules::getSystemSetting($this->prefix, EpicClinicalNotes::EPIC_CLIENT_ID));
+        $timestamp = $this->module->getSystemSetting('epic-access-token-timestamp');
+        $token = $this->module->getSystemSetting('epic-access-token');
+        if(!$this->token){
+            if(!$timestamp || time() > $timestamp || !$token) {
+                $this->token = $this->epicAuthenticator->getEpicAccessToken();
+                $this->module->setSystemSetting('epic-access-token', $this->token);
+                // Set expiration to 1 hour from now
+                $this->module->setSystemSetting('epic-access-token-timestamp', time() + 3600);
+            }else{
+                $this->token = $token;
+            }
         }
-        return $this->client_id;
+        return $this->token;
     }
-
     /**
-     * @param mixed $client_id
+     * Set an Epic SmartData Element (SDE) value using Epic Interconnect SETSMARTDATAVALUES.
+     *
+     * Uses Bearer token from getToken() and sends a PUT request with JSON payload.
+     *
+     * @param string $fhirPatientId The patient identifier (typically FHIR ID).
+     * @param string $smartDataId   The SmartData ID (e.g., "REDCAP#008").
+     * @param string $value         The value to write.
+     * @param array $opts           Optional overrides:
+     *                             - smartDataUrl (string) full endpoint URL
+     *                             - contextName (string) default PATIENT
+     *                             - entityIdType (string) default FHIR
+     *                             - contactId (string) default ""
+     *                             - contactIdType (string) default DAT
+     *                             - userId (string) default "1"
+     *                             - userIdType (string) default External
+     *                             - source (string) default Web Service
+     *                             - smartDataIdType (string) default SDI
+     *
+     * @return array Decoded JSON response (or ['raw' => ..., 'http_code' => ...] if non-JSON)
+     * @throws \Exception
      */
-    public function setClientId($client_id): void
+    public function setSmartDataElementValue(string $fhirPatientId, string $smartDataId, string $value, array $opts = []): array
     {
-        $this->client_id = $client_id;
-    }
+        // Endpoint URL must be configured (prefer module system setting)
+        $smartDataUrl = rtrim($this->module->getEpicBaseUrl(), '/') . '/api/epic/2013/Clinical/Utility/SETSMARTDATAVALUES/SmartData/Values';
 
+        if (!$smartDataUrl) {
+            throw new \Exception('Missing Epic SmartData endpoint URL. Set system setting epic-smartdata-url or pass opts[smartDataUrl].');
+        }
 
-    public function authenticate()
-    {
-        $url = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token';
-        $client_id = $this->getClientId();
-        $client_secret = $this->getClientSecret();
+        if(!$smartDataId){
+            throw new \Exception('Missing required parameter: smartDataId.');
+        }
 
-        $data = [
-            'grant_type' => 'client_credentials',
-            'client_id' => $client_id,
-            'client_secret' => $client_secret
+        if(!$fhirPatientId){
+            throw new \Exception('Missing required parameter: fhirPatientId.');
+        }
+
+        $payload = [
+            'ContextName'   => $opts['contextName']   ?? 'PATIENT',
+            'EntityID'      => $fhirPatientId,
+            'EntityIDType'  => $opts['entityIdType']  ?? self::ENTITY_ID_TYPE,
+            'ContactID'     => $opts['contactId']     ?? '',
+            'ContactIDType' => $opts['contactIdType'] ?? 'DAT',
+            'UserID'        => $opts['userId']        ?? '1',
+            'UserIDType'    => $opts['userIdType']    ?? 'External',
+            'Source'        => $opts['source']        ?? 'Web Service',
+            'SmartDataValues' => [[
+                'SmartDataID'     => $smartDataId,
+                'SmartDataIDType' => $opts['smartDataIdType'] ?? 'SDI',
+                'Values'          => [$value],
+                'Comments'        => [],
+            ]],
         ];
 
-        $response = $this->client->post($url, $data);
-        if (isset($response['access_token'])) {
-            $this->token = $response['access_token'];
-        } else {
-            throw new \Exception('Authentication failed: ' . json_encode($response));
+        $token = $this->getToken();
+
+        try {
+            $resp = $this->client->request('PUT', $smartDataUrl, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => $payload,
+                'timeout' => 45,
+            ]);
+
+            $status = $resp->getStatusCode();
+            $body   = (string) $resp->getBody();
+
+            $json = json_decode($body, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $json['_http_code'] = $status;
+                return $json;
+            }
+
+            return [
+                '_http_code' => $status,
+                'raw' => $body,
+            ];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $status = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
+            $body   = $e->getResponse() ? (string)$e->getResponse()->getBody() : '';
+
+            // Bubble a useful error message up to callers
+            throw new \Exception('Epic SETSMARTDATAVALUES request failed (HTTP ' . $status . '): ' . $body, 0, $e);
+        } catch (GuzzleException $e) {
+            throw new \Exception($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Get Epic SmartData Element (SDE) values using Epic Interconnect GETSMARTDATAVALUES.
+     *
+     * If $smartDataId is provided, the request will include SmartDataIDs to fetch that SDE.
+     * If $smartDataId is null/empty, Epic will return all available SDE values for the entity.
+     *
+     * @param string      $entityId     The patient/entity identifier.
+     * @param string|null $smartDataId  Optional SmartData ID (e.g., "REDCAP#002"); pass null to fetch all.
+     * @param array       $opts         Optional overrides:
+     *                                 - contextName (string) default PATIENT
+     *                                 - entityIdType (string) default FHIR
+     *                                 - contactId (string) default ""
+     *                                 - contactIdType (string) default DAT
+     *                                 - userId (string) default "1"
+     *                                 - userIdType (string) default External
+     *                                 - source (string) default Web Service
+     *                                 - smartDataIdType (string) default SDI
+     *                                 - smartDataUrl (string) override full endpoint URL
+     *
+     * @return array Decoded JSON response (or ['raw' => ..., '_http_code' => ...] if non-JSON)
+     * @throws \Exception
+     */
+    public function getSmartDataElementValues(string $entityId, ?string $smartDataId = null, array $opts = []): array
+    {
+        $smartDataUrl = rtrim($this->module->getEpicBaseUrl(), '/') . '/api/epic/2013/Clinical/Utility/GETSMARTDATAVALUES/SmartData/Values';
+
+        if (!$smartDataUrl) {
+            throw new \Exception('Missing Epic SmartData endpoint URL for GETSMARTDATAVALUES.');
+        }
+
+        $payload = [
+            'ContextName'   => $opts['contextName']   ?? 'PATIENT',
+            'EntityID'      => $entityId,
+            'EntityIDType'  => $opts['entityIdType']  ?? self::ENTITY_ID_TYPE,
+            'ContactID'     => $opts['contactId']     ?? '',
+            'ContactIDType' => $opts['contactIdType'] ?? 'DAT',
+            'UserID'        => $opts['userId']        ?? '1',
+            'UserIDType'    => $opts['userIdType']    ?? 'External',
+            'Source'        => $opts['source']        ?? 'Web Service',
+        ];
+
+        $smartDataId = is_string($smartDataId) ? trim($smartDataId) : '';
+        if ($smartDataId !== '') {
+            $payload['SmartDataIDs'] = [[
+                'ID'   => $smartDataId,
+                'Type' => $opts['smartDataIdType'] ?? 'SDI',
+            ]];
+        }
+
+        $token = $this->getToken();
+
+        try {
+            // Epic Interconnect expects POST for GETSMARTDATAVALUES in this API family
+            $resp = $this->client->request('POST', $smartDataUrl, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => $payload,
+                'timeout' => 45,
+            ]);
+
+            $status = $resp->getStatusCode();
+            $body   = (string) $resp->getBody();
+
+            $json = json_decode($body, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $json['_http_code'] = $status;
+                return $json;
+            }
+
+            return [
+                '_http_code' => $status,
+                'raw' => $body,
+            ];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $status = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
+            $body   = $e->getResponse() ? (string)$e->getResponse()->getBody() : '';
+            throw new \Exception('Epic GETSMARTDATAVALUES request failed (HTTP ' . $status . '): ' . $body, 0, $e);
+        } catch (GuzzleException $e) {
+            throw new \Exception($e->getMessage(), $e->getCode(), $e);
         }
     }
 }
