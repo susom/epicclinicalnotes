@@ -100,6 +100,7 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                 }
 
                 $label = (string) ($Proj->metadata[$rcField]['element_label'] ?? $rcField);
+                $label = \Piping::replaceVariablesInLabel($label, $recordID, $firstEventId);
                 $label = $this->normalizeLabel($label);
 
                 $type  = (string) ($Proj->metadata[$rcField]['element_type'] ?? '');

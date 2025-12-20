@@ -6,7 +6,14 @@ try{
     #$accessToken = $client->getToken();
     $module->cronSyncEpicClinicalNotesBatchProcess();
     echo "<pre>";
-    $response = $client->getSmartDataElementValues('', 'REDCAP#008', );
+    $param = [
+        'project_id' => PROJECT_ID,
+        'records' => [1],
+    ];
+    $records = \REDCap::getData($param);
+    $mrnField = $module->getProjectSetting('redcap-mrn-field');
+    $mrn = $records[1][$module->getFirstEventId()][$mrnField];
+    $response = $client->getSmartDataElementValues($mrn, '', );
     print_r($response);
     echo "</pre>";
 } catch (Exception $e) {
