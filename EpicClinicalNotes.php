@@ -65,7 +65,7 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
         $firstEventId = $this->getFirstEventId();
         $recordBundle = \REDCap::getData($param);
         $data         = $recordBundle[$recordID][$firstEventId] ?? [];
-
+        $divider      = $this->getProjectSetting('responses-divider')?:' && ';
         $out = [];
 
         foreach ((array) $this->getMaps() as $map) {
@@ -142,7 +142,7 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
             }
 
             if (!empty($parts)) {
-                $out[$epicField] = implode(' && ', $parts);
+                $out[$epicField] = implode($divider, $parts);
             }
         }
 

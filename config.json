@@ -41,6 +41,12 @@
             "type": "field-list"
         },
         {
+            "key": "responses-divider",
+            "name": "<b>Divider between Epic responses</b>. if left empty the system will use a pipe (|) character.",
+            "required": false,
+            "type": "text"
+        },
+        {
             "key": "maps",
             "name": "<b>REDCap SDE mapping</b><br>Define the mapping between REDCap fields and Epic Clinical Notes SDE fields.",
             "required": true,
