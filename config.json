@@ -42,7 +42,7 @@
         },
         {
             "key": "responses-divider",
-            "name": "<b>Divider between Epic responses</b>. if left empty the system will use a pipe (|) character.",
+            "name": "<b>Divider between Epic responses</b>. if left empty the system will use a pipe ( | ) character.",
             "required": false,
             "type": "text"
         },
