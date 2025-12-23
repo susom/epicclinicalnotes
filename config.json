@@ -1,5 +1,5 @@
 {
-    "name": "EpicClinicalNotes",
+    "name": "Epic Clinical Notes",
     "namespace": "Stanford\\EpicClinicalNotes",
     "description": "This module will facilitate pushing Clinical notes from REDCap to an Epic encounter. ",
     "documentation": "README.md",
@@ -13,12 +13,6 @@
     ],
     "enable-every-page-hooks-on-system-pages": false,
     "enable-ajax-logging": false,
-    "auth-ajax-actions": [
-        "TestAction"
-    ],
-    "no-auth-ajax-actions": [
-        "TestAction"
-    ],
     "links": {
         "project": [
             {
