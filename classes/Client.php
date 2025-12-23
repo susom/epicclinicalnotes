@@ -134,7 +134,7 @@ final class Client
             $body   = $e->getResponse() ? (string)$e->getResponse()->getBody() : '';
 
             // Bubble a useful error message up to callers
-            throw new \Exception('Epic SETSMARTDATAVALUES request failed (HTTP ' . $status . '): ' . $body, 0, $e);
+            throw new \Exception($body, 0, $e);
         } catch (GuzzleException $e) {
             throw new \Exception($e->getMessage(), $e->getCode(), $e);
         }
@@ -219,7 +219,7 @@ final class Client
         } catch (\GuzzleHttp\Exception\RequestException $e) {
             $status = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
             $body   = $e->getResponse() ? (string)$e->getResponse()->getBody() : '';
-            throw new \Exception('Epic GETSMARTDATAVALUES request failed (HTTP ' . $status . '): ' . $body, 0, $e);
+            throw new \Exception($body, 0, $e);
         } catch (GuzzleException $e) {
             throw new \Exception($e->getMessage(), $e->getCode(), $e);
         }

@@ -274,16 +274,24 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
             ];
             $records = \REDCap::getData($param);
             foreach ($records as $recordID => $record) {
-                $preparedData = $this->prepareEpicSdeValues($recordID);
-                $mrn = $record[$this->getFirstEventId()][$mrnField];
-                foreach ($preparedData as $SDEField => $value) {
-                    $existingData = $this->getClient()->getSmartDataElementValues($mrn, $SDEField);
-                    // only sets value if empty never overwrite existing value
-                    if(empty($existingData['SmartDataValues'][0]['Value'])){
-                        $this->getClient()->setSmartDataElementValue($mrn, $SDEField, $value);
-                        \REDCap::logEvent('Epic Clinical Notes Sync', "Set SDE Field '$SDEField' for MRN '$mrn'", null, $recordID);
-                    }
+                // put try catch here to avoid one bad record stopping the whole batch
+                try{
+                    $preparedData = $this->prepareEpicSdeValues($recordID);
+                    $mrn = $record[$this->getFirstEventId()][$mrnField];
+                    foreach ($preparedData as $SDEField => $value) {
+                        $existingData = $this->getClient()->getSmartDataElementValues($mrn, $SDEField);
+                        // only sets value if empty never overwrite existing value
+                        if(empty($existingData['SmartDataValues'][0]['Values'])){
+                            $this->getClient()->setSmartDataElementValue($mrn, $SDEField, $value);
+                            \REDCap::logEvent('Epic Clinical Notes Sync', "Set SDE Field '$SDEField' for MRN '$mrn'", null, $recordID);
+                        }
 
+                    }
+                }catch (\Exception $e){
+                    $body = $e->getMessage();
+                    $parts = json_decode($body, true);
+                    \REDCap::logEvent("EXCEPTION", "Error syncing record ID '$recordID': " . ($parts['Message'] ?? $body), null, $recordID);
+                    continue;
                 }
 
             }
