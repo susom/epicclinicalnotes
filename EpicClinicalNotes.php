@@ -40,23 +40,15 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
-     * Prepare a payload of Epic SDE field => formatted text value for a single REDCap record.
-     *
-     * Each map entry (from getMaps()) is expected to include:
-     *  - epic-sde-field (string)
-     *  - redcap-fields (array of REDCap field names)
-     *
-     * Output format per Epic SDE:
-     *   "Field Label 1 : Value 1 | Field Label 2 : Value 2 | ..."
+     * Prepare a payload of Epic SDE field => RTF table formatted value for a single REDCap record.
      *
      * @param string|int $recordID
-     * @return array<string,string>  epicSdeField => formattedValue
+     * @return array<string,string>  epicSdeField => RTF formatted table
      */
     public function prepareEpicSdeValues($recordID): array
     {
         global $Proj;
 
-        // Fetch record data for the first event
         $param = [
             'project_id' => PROJECT_ID,
             'records'    => [$recordID],
@@ -65,28 +57,25 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
         $firstEventId = $this->getFirstEventId();
         $recordBundle = \REDCap::getData($param);
         $data         = $recordBundle[$recordID][$firstEventId] ?? [];
-        $divider      = $this->getProjectSetting('responses-divider')?:' | ';
+
         $out = [];
 
         foreach ((array) $this->getMaps() as $map) {
             $epicField = $map['epic-sde-field'];
-
-            $rcFields = $map['redcap-fields'];
+            $rcFields  = $map['redcap-fields'];
 
             if (!$epicField) {
                 continue;
             }
 
-            // Normalize fields list
             if (is_string($rcFields)) {
-                // allow comma-separated strings just in case
                 $rcFields = array_values(array_filter(array_map('trim', explode(',', $rcFields))));
             }
             if (!is_array($rcFields)) {
                 $rcFields = [];
             }
 
-            $parts = [];
+            $rows = [];
 
             foreach ($rcFields as $rcField) {
                 $rcField = array_pop($rcField);
@@ -94,7 +83,6 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                     continue;
                 }
 
-                // Metadata must exist
                 if (!isset($Proj->metadata[$rcField])) {
                     continue;
                 }
@@ -105,11 +93,8 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
 
                 $type  = (string) ($Proj->metadata[$rcField]['element_type'] ?? '');
                 $enum  = (string) ($Proj->metadata[$rcField]['element_enum'] ?? '');
+                $raw   = $data[$rcField] ?? null;
 
-                // Raw value from record data
-                $raw = $data[$rcField] ?? null;
-
-                // Checkbox values come back as an array of code => 0/1
                 if ($type === 'checkbox') {
                     if (!is_array($raw) || empty($raw)) {
                         continue;
@@ -119,11 +104,10 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                         continue;
                     }
                     $display = implode(', ', $checkedLabels);
-                    $parts[] = $label . ' : ' . $display;
+                    $rows[] = ['label' => $label, 'value' => $display];
                     continue;
                 }
 
-                // Everything else is scalar
                 $rawStr = is_scalar($raw) ? (string) $raw : '';
                 $rawStr = trim($rawStr);
 
@@ -131,22 +115,85 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                     continue;
                 }
 
-                // For coded fields, convert stored value to display label
                 if (in_array($type, ['select', 'radio', 'yesno', 'truefalse'], true)) {
                     $display = $this->getCodedValueLabel($type, $enum, $rawStr);
-                    $parts[] = $label . ' : ' . $display;
+                    $rows[] = ['label' => $label, 'value' => $display];
                 } else {
-                    // Treat as free text
-                    $parts[] = $label . ' : ' . $rawStr;
+                    $rows[] = ['label' => $label, 'value' => $rawStr];
                 }
             }
 
-            if (!empty($parts)) {
-                $out[$epicField] = implode($divider, $parts);
+            if (!empty($rows)) {
+                $out[$epicField] = $this->buildRtfTable($rows);
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Build an RTF table from label/value pairs.
+     *
+     * @param array $rows  Array of ['label' => string, 'value' => string]
+     * @return string RTF formatted table
+     */
+    /**
+     * Build RTF formatted table with two columns: Question and Response.
+     *
+     * @param array $rows  Array of ['label' => string, 'value' => string]
+     * @return string RTF formatted table
+     */
+    private function buildRtfTable(array $rows): string
+    {
+        // Define column widths in twips (1 inch = 1440 twips)
+        $col1Width = 4320; // 3 inches for Question column
+        $col2Width = 4320; // 3 inches for Response column
+        $totalWidth = $col1Width + $col2Width;
+
+        $rtf = '{\rtf1\ansi\deff0 ';
+
+        // Table header row
+        $rtf .= '\trowd\trgaph108\trleft0';
+        $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
+        $rtf .= '\cellx' . $col1Width;
+        $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
+        $rtf .= '\cellx' . $totalWidth;
+        $rtf .= '\pard\intbl\b Question\b0\cell';
+        $rtf .= '\pard\intbl\b Response\b0\cell';
+        $rtf .= '\row';
+
+        // Data rows
+        foreach ($rows as $row) {
+            $label = $this->escapeRtf($row['label']);
+            $value = $this->escapeRtf($row['value']);
+
+            $rtf .= '\trowd\trgaph108\trleft0';
+            $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
+            $rtf .= '\cellx' . $col1Width;
+            $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
+            $rtf .= '\cellx' . $totalWidth;
+            $rtf .= '\pard\intbl ' . $label . '\cell';
+            $rtf .= '\pard\intbl ' . $value . '\cell';
+            $rtf .= '\row';
+        }
+
+        $rtf .= '}';
+
+        return $rtf;
+    }
+
+    /**
+     * Escape special RTF characters.
+     *
+     * @param string $text
+     * @return string
+     */
+    private function escapeRtf(string $text): string
+    {
+        $text = str_replace('\\', '\\\\', $text);
+        $text = str_replace('{', '\{', $text);
+        $text = str_replace('}', '\}', $text);
+        return $text;
     }
 
     /**
@@ -281,10 +328,10 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                     foreach ($preparedData as $SDEField => $value) {
                         $existingData = $this->getClient()->getSmartDataElementValues($mrn, $SDEField);
                         // only sets value if empty never overwrite existing value
-                        if(empty($existingData['SmartDataValues'][0]['Values'])){
+                        //if(empty($existingData['SmartDataValues'][0]['Values'])){
                             $this->getClient()->setSmartDataElementValue($mrn, $SDEField, $value);
                             \REDCap::logEvent('Epic Clinical Notes Sync', "Set SDE Field '$SDEField' for MRN '$mrn'", null, $recordID);
-                        }
+                        //}
 
                     }
                 }catch (\Exception $e){

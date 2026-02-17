@@ -13,7 +13,8 @@ try{
     $records = \REDCap::getData($param);
     $mrnField = $module->getProjectSetting('redcap-mrn-field');
     $mrn = $records[1][$module->getFirstEventId()][$mrnField];
-    $response = $client->getSmartDataElementValues($mrn, '', );
+    //$response = $client->getSmartDataElementValues($mrn, '', );
+    $response = $module->prepareEpicSdeValues(1);
     print_r($response);
     echo "</pre>";
 } catch (Exception $e) {
