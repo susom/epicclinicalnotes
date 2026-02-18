@@ -61,6 +61,12 @@
                     "type": "sub_settings",
                     "sub_settings": [
                         {
+                            "key": "custom-label",
+                            "name": "<b>Custom Label (optional)</b><br>By default, the system will use the REDCap field label in the SDE response formatting. You can provide a custom label to be used instead. (You can use Smart variable in these labels e.g [fist_name])",
+                            "required": false,
+                            "type": "text"
+                        },
+                        {
                             "key": "redcap-field",
                             "name": "<b>REDCap Field</b><br>The REDCap field to map from.",
                             "required": true,

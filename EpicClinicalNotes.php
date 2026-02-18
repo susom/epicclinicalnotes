@@ -77,8 +77,9 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
 
             $rows = [];
 
-            foreach ($rcFields as $rcField) {
-                $rcField = array_pop($rcField);
+            foreach ($rcFields as $rcFieldArr) {
+                $label = $rcFieldArr['custom-label'] ?? null;
+                $rcField = $rcFieldArr['redcap-field'] ?? null;
                 if (!is_string($rcField) || $rcField === '') {
                     continue;
                 }
@@ -86,8 +87,10 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                 if (!isset($Proj->metadata[$rcField])) {
                     continue;
                 }
+                if(is_null($label)){
+                    $label = (string) ($Proj->metadata[$rcField]['element_label'] ?? $rcField);
+                }
 
-                $label = (string) ($Proj->metadata[$rcField]['element_label'] ?? $rcField);
                 $label = \Piping::replaceVariablesInLabel($label, $recordID, $firstEventId);
                 $label = $this->normalizeLabel($label);
 
@@ -138,43 +141,26 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
      * @return string RTF formatted table
      */
     /**
-     * Build RTF formatted table with two columns: Question and Response.
+     * Build RTF formatted content with bold question, colon, answer, and newline.
      *
      * @param array $rows  Array of ['label' => string, 'value' => string]
-     * @return string RTF formatted table
+     * @return string RTF formatted content
      */
     private function buildRtfTable(array $rows): string
     {
-        // Define column widths in twips (1 inch = 1440 twips)
-        $col1Width = 4320; // 3 inches for Question column
-        $col2Width = 4320; // 3 inches for Response column
-        $totalWidth = $col1Width + $col2Width;
-
         $rtf = '{\rtf1\ansi\deff0 ';
 
-        // Table header row
-        $rtf .= '\trowd\trgaph108\trleft0';
-        $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
-        $rtf .= '\cellx' . $col1Width;
-        $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
-        $rtf .= '\cellx' . $totalWidth;
-        $rtf .= '\pard\intbl\b Question\b0\cell';
-        $rtf .= '\pard\intbl\b Response\b0\cell';
-        $rtf .= '\row';
-
-        // Data rows
-        foreach ($rows as $row) {
+        foreach ($rows as $index => $row) {
             $label = $this->escapeRtf($row['label']);
             $value = $this->escapeRtf($row['value']);
 
-            $rtf .= '\trowd\trgaph108\trleft0';
-            $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
-            $rtf .= '\cellx' . $col1Width;
-            $rtf .= '\clbrdrt\brdrs\clbrdrl\brdrs\clbrdrb\brdrs\clbrdrr\brdrs';
-            $rtf .= '\cellx' . $totalWidth;
-            $rtf .= '\pard\intbl ' . $label . '\cell';
-            $rtf .= '\pard\intbl ' . $value . '\cell';
-            $rtf .= '\row';
+            // Bold question, colon, then answer
+            $rtf .= '\b ' . $label . ':\b0  ' . $value;
+
+            // Add newline after each row except the last
+            if ($index < count($rows) - 1) {
+                $rtf .= '\line ';
+            }
         }
 
         $rtf .= '}';
