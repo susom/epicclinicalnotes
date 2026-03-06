@@ -102,8 +102,8 @@
             "cron_name": "sync-epic-clinical-notes-batch-process",
             "cron_description": "Sync Epic Clinical Notes Batch Process",
             "method": "cronSyncEpicClinicalNotesBatchProcess",
-            "cron_frequency": "3600",
-            "cron_max_run_time": "3600"
+            "cron_frequency": "86400",
+            "cron_max_run_time": "7200"
         }
     ],
     "compatibility": {
