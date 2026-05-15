@@ -12,7 +12,7 @@ final class Client
 
     private \GuzzleHttp\Client $client;
 
-    public \Stanford\EpicAuthenticator\EpicAuthenticator $epicAuthenticator;
+    public ?\Stanford\EpicAuthenticator\EpicAuthenticator $epicAuthenticator = null;
 
     private \Stanford\EpicClinicalNotes\EpicClinicalNotes $module;
     /**
@@ -37,6 +37,9 @@ final class Client
         $token = $this->module->getSystemSetting('epic-access-token');
         if(!$this->token){
             if(!$timestamp || time() > $timestamp || !$token) {
+                if (!$this->epicAuthenticator) {
+                    throw new \Exception('EpicAuthenticator module is not configured. Set the "epic-authenticator-prefix" system setting to the prefix of the installed EpicAuthenticator EM.');
+                }
                 $this->token = $this->epicAuthenticator->getEpicAccessToken();
                 $this->module->setSystemSetting('epic-access-token', $this->token);
                 // Set expiration to 1 hour from now

@@ -4,7 +4,7 @@
 try{
     $client = $module->getClient();
     #$accessToken = $client->getToken();
-    $module->cronSyncEpicClinicalNotesBatchProcess();
+    $module->cronSyncEpicClinicalNotesBatchProcess($_GET['pid']);
     echo "<pre>";
     $param = [
         'project_id' => PROJECT_ID,

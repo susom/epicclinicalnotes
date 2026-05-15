@@ -289,10 +289,14 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
         return $out;
     }
 
-    public function cronSyncEpicClinicalNotesBatchProcess()
+    public function cronSyncEpicClinicalNotesBatchProcess($pid = null)
     {
         $projects = ExternalModules::getEnabledProjects($this->PREFIX);
         while($project = $projects->fetch_assoc()){
+            // if this method is called from test page ignore other projects
+            if($pid and $pid != $project['project_id']){
+                continue;
+            }
             $_GET['pid'] = $project['project_id'];
             $this->setProjectId($project['project_id']);
             $mrnField = $this->getProjectSetting('redcap-mrn-field');
