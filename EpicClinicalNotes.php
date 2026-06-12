@@ -78,7 +78,7 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
             $rows = [];
 
             foreach ($rcFields as $rcFieldArr) {
-                $label = $rcFieldArr['custom-label'] ?? null;
+                $customLabel = $rcFieldArr['custom-label'] ?? null;
                 $rcField = $rcFieldArr['redcap-field'] ?? null;
                 if (!is_string($rcField) || $rcField === '') {
                     continue;
@@ -87,12 +87,38 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
                 if (!isset($Proj->metadata[$rcField])) {
                     continue;
                 }
-                if(is_null($label)){
+
+                // Distinguish "no custom label provided" (fall back to field label)
+                // from "custom label intentionally blank/whitespace" (suppress label entirely).
+                $suppressLabel = false;
+                if (is_null($customLabel) || $customLabel === '') {
                     $label = (string) ($Proj->metadata[$rcField]['element_label'] ?? $rcField);
+                } else {
+                    $label = (string) $customLabel;
+                    if (trim($label) === '') {
+                        $suppressLabel = true;
+                    }
                 }
 
-                $label = \Piping::replaceVariablesInLabel($label, $recordID, $firstEventId);
+                // Pipe smart variables / [field_name] tokens using this project's context.
+                // - $replaceWithUnderlineIfMissing = false: avoids the "____" underline placeholder
+                //   when a piped field has no value (e.g. [first_name] empty -> empty, not ____).
+                // - $wrapValueInSpan = false: don't wrap piped values in <span> tags that
+                //   normalizeLabel() would then strip.
+                $label = \Piping::replaceVariablesInLabel(
+                    $label,
+                    $recordID,
+                    $firstEventId,
+                    1,
+                    [],
+                    false,                // replaceWithUnderlineIfMissing
+                    $this->getProjectId(),
+                    false                 // wrapValueInSpan
+                );
                 $label = $this->normalizeLabel($label);
+                if ($suppressLabel) {
+                    $label = '';
+                }
 
                 $type  = (string) ($Proj->metadata[$rcField]['element_type'] ?? '');
                 $enum  = (string) ($Proj->metadata[$rcField]['element_enum'] ?? '');
@@ -151,11 +177,17 @@ class EpicClinicalNotes extends \ExternalModules\AbstractExternalModule {
         $rtf = '{\rtf1\ansi\deff0 ';
 
         foreach ($rows as $index => $row) {
-            $label = $this->escapeRtf($row['label']);
-            $value = $this->escapeRtf($row['value']);
+            $labelRaw = (string) $row['label'];
+            $value    = $this->escapeRtf($row['value']);
 
-            // Bold question, colon, then answer
-            $rtf .= '\b ' . $label . ':\b0  ' . $value;
+            if (trim($labelRaw) === '') {
+                // No label -> just emit the value, no bold prefix or colon.
+                $rtf .= $value;
+            } else {
+                $label = $this->escapeRtf($labelRaw);
+                // Bold question, colon, then answer
+                $rtf .= '\b ' . $label . ':\b0  ' . $value;
+            }
 
             // Add newline after each row except the last
             if ($index < count($rows) - 1) {
